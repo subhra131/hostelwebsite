@@ -11,6 +11,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import DummyPaymentPage from './pages/DummyPaymentPage';
+import WishlistPage from './pages/WishlistPage';
 import './App.css';
 
 const ProtectedRoute = ({ element, requiredRole, allowedRoles }) => {
@@ -51,6 +52,10 @@ function App() {
             <Route
               path="/student-dashboard"
               element={<ProtectedRoute element={<StudentDashboard />} requiredRole="student" />}
+            />
+            <Route
+              path="/wishlist"
+              element={<ProtectedRoute element={<WishlistPage />} requiredRole="student" />}
             />
             <Route
               path="/owner-dashboard"

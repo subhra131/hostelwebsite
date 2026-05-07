@@ -17,6 +17,10 @@ const HostelDetailsPage = () => {
   const [checkoutPhase, setCheckoutPhase] = useState(null);
   const [checkoutOrder, setCheckoutOrder] = useState(null);
   const [checkoutPaymentRef, setCheckoutPaymentRef] = useState('');
+  const [savedToWishlist, setSavedToWishlist] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistActionLoading, setWishlistActionLoading] = useState(false);
+  const [wishlistError, setWishlistError] = useState('');
   const [mainImage, setMainImage] = useState(0);
   const [reviews, setReviews] = useState([]);
   const [canRate, setCanRate] = useState(false);
@@ -29,6 +33,29 @@ const HostelDetailsPage = () => {
     fetchHostel();
     fetchReviews();
   }, [id]);
+
+  useEffect(() => {
+    const fetchWishlistStatus = async () => {
+      if (!user || user.role !== 'student') {
+        setSavedToWishlist(false);
+        setWishlistLoading(false);
+        return;
+      }
+      setWishlistLoading(true);
+      try {
+        const { data } = await api.get('/users/wishlist');
+        const isSaved = (data.wishlist || []).some((item) => item._id === id);
+        setSavedToWishlist(isSaved);
+        setWishlistError('');
+      } catch (err) {
+        setWishlistError('Unable to load wishlist status.');
+      } finally {
+        setWishlistLoading(false);
+      }
+    };
+
+    fetchWishlistStatus();
+  }, [user, id]);
 
   const fetchHostel = async () => {
     try {
@@ -108,6 +135,31 @@ const HostelDetailsPage = () => {
     setBookingSuccess(true);
     setMessage('');
     setTimeout(() => setBookingSuccess(false), 6000);
+  };
+
+  const handleToggleWishlist = async () => {
+    if (!user || user.role !== 'student') {
+      alert('Only students can save hostels to wishlist.');
+      return;
+    }
+
+    setWishlistActionLoading(true);
+    try {
+      if (savedToWishlist) {
+        await api.delete(`/users/wishlist/${id}`);
+        setSavedToWishlist(false);
+        alert('Hostel removed from wishlist.');
+      } else {
+        await api.post(`/users/wishlist/${id}`);
+        setSavedToWishlist(true);
+        alert('Hostel added to wishlist.');
+      }
+      setWishlistError('');
+    } catch (err) {
+      setWishlistError(err.response?.data?.message || 'Unable to update wishlist.');
+    } finally {
+      setWishlistActionLoading(false);
+    }
   };
 
   const handleSubmitRating = async (e) => {
@@ -266,18 +318,41 @@ const HostelDetailsPage = () => {
                 />
               </div>
 
+              {user?.role === 'student' && (
+                <button
+                  type="button"
+                  className="btn-wishlist"
+                  onClick={handleToggleWishlist}
+                  disabled={wishlistLoading || wishlistActionLoading}
+                >
+                  {wishlistLoading
+                    ? 'Loading…'
+                    : savedToWishlist
+                    ? 'Remove from wishlist'
+                    : 'Save to wishlist'}
+                </button>
+              )}
+              {wishlistError && <div className="error">{wishlistError}</div>}
+
               <button
                 type="submit"
                 className="btn-book"
-                disabled={checkoutPhase === 'loading' || !user}
+                disabled={checkoutPhase === 'loading' || !user || bookingSuccess}
               >
                 {checkoutPhase === 'loading'
                   ? 'Opening checkout…'
+                  : bookingSuccess
+                  ? 'Request sent successfully'
                   : user
                   ? `Pay ₹${advanceRupees} advance & request booking`
                   : 'Login to Book'}
               </button>
             </form>
+            {bookingSuccess && (
+              <div className="booking-success-message">
+                Your booking request was sent successfully. The owner has been notified.
+              </div>
+            )}
           </div>
         </div>
       </div>
