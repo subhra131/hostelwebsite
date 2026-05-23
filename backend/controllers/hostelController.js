@@ -302,6 +302,135 @@ exports.deleteHostelPhoto = async (req, res) => {
   }
 };
 
+// Get available rooms for a hostel and room type
+exports.getAvailableRooms = async (req, res) => {
+  try {
+    const { hostelId, roomType } = req.query;
+
+    if (!hostelId || !roomType) {
+      return res.status(400).json({ success: false, message: 'Please provide hostel id and room type' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(hostelId)) {
+      return res.status(400).json({ success: false, message: 'Invalid hostel id' });
+    }
+
+    const hostel = await Hostel.findById(hostelId);
+    if (!hostel) {
+      return res.status(404).json({ success: false, message: 'Hostel not found' });
+    }
+
+    const room = hostel.roomTypes.find((r) => r.type === roomType);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room type not found' });
+    }
+
+    // Import at the top of the file or use require here
+    const Booking = require('../models/Booking');
+    const BookingOrder = require('../models/BookingOrder');
+
+    const now = new Date();
+    const SINGLE_ROOM_RANGE = { start: 1, end: 15 };
+    const DOUBLE_ROOM_RANGE = { start: 25, end: 50 };
+
+    const getRoomRange = (type, totalRooms) => {
+      if (type === 'Single Bed') {
+        const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 15) : 15;
+        return { start: 1, end: maxRooms };
+      }
+      if (type === 'Double Bed') {
+        const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 26) : 26;
+        return { start: 25, end: 24 + maxRooms };
+      }
+      return null;
+    };
+
+    const range = getRoomRange(roomType, room.totalRooms);
+    if (!range) {
+      return res.status(400).json({ success: false, message: 'Invalid room type' });
+    }
+
+    // Get all bookings and pending orders for this room type
+    const bookings = await Booking.find({
+      hostel: hostelId,
+      roomType,
+      status: { $in: ['pending', 'approved'] },
+      roomNumber: { $gte: range.start, $lte: range.end },
+    }).select('roomNumber student');
+
+    const orders = await BookingOrder.find({
+      hostel: hostelId,
+      roomType,
+      status: 'created',
+      expiresAt: { $gt: now },
+      roomNumber: { $gte: range.start, $lte: range.end },
+    }).select('roomNumber student');
+
+    // Build occupancy map
+    const occupancy = {};
+    const bookingOccupants = {};
+    const maxOccupancy = roomType === 'Double Bed' ? 2 : 1;
+
+    bookings.forEach((booking) => {
+      if (booking.roomNumber >= range.start && booking.roomNumber <= range.end) {
+        occupancy[booking.roomNumber] = (occupancy[booking.roomNumber] || 0) + 1;
+        if (!bookingOccupants[booking.roomNumber]) {
+          bookingOccupants[booking.roomNumber] = [];
+        }
+        bookingOccupants[booking.roomNumber].push(booking.student);
+      }
+    });
+
+    orders.forEach((order) => {
+      if (order.roomNumber >= range.start && order.roomNumber <= range.end) {
+        occupancy[order.roomNumber] = (occupancy[order.roomNumber] || 0) + 1;
+      }
+    });
+
+    // Populate student details for occupants
+    const populatedBookings = await Booking.find({
+      hostel: hostelId,
+      roomType,
+      status: { $in: ['pending', 'approved'] },
+      roomNumber: { $gte: range.start, $lte: range.end },
+    }).populate('student', 'name phone');
+
+    const occupantDetails = {};
+    populatedBookings.forEach((booking) => {
+      if (!occupantDetails[booking.roomNumber]) {
+        occupantDetails[booking.roomNumber] = [];
+      }
+      occupantDetails[booking.roomNumber].push({
+        name: booking.student.name,
+        phone: booking.student.phone,
+      });
+    });
+
+    // Build available rooms list
+    const availableRooms = [];
+    for (let roomNum = range.start; roomNum <= range.end; roomNum += 1) {
+      const currentOccupancy = occupancy[roomNum] || 0;
+      const isAvailable = currentOccupancy < maxOccupancy;
+      availableRooms.push({
+        roomNumber: roomNum,
+        available: isAvailable,
+        occupancy: currentOccupancy,
+        maxOccupancy,
+        occupants: occupantDetails[roomNum] || [],
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      roomType,
+      maxOccupancy,
+      availableRooms,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Admin: hostels awaiting approval
 exports.getPendingHostels = async (req, res) => {
   try {

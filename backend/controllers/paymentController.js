@@ -98,10 +98,14 @@ async function selectRoomNumber(hostelId, roomType, totalRooms) {
  */
 exports.createBookingOrder = async (req, res) => {
   try {
-    const { hostelId, roomType, checkInDate, checkOutDate, message, forceMock } = req.body;
+    const { hostelId, roomType, checkInDate, checkOutDate, message, roomNumber, forceMock } = req.body;
 
     if (!hostelId || !roomType) {
       return res.status(400).json({ success: false, message: 'Please provide hostel and room type' });
+    }
+
+    if (roomNumber == null || typeof roomNumber !== 'number') {
+      return res.status(400).json({ success: false, message: 'Please select a room number' });
     }
 
     if (!mongoose.Types.ObjectId.isValid(hostelId)) {
@@ -125,15 +129,38 @@ exports.createBookingOrder = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Room type not found' });
     }
 
-    const monthlyRent = room.pricePerMonth;
-    const roomNumber = await selectRoomNumber(hostel._id, roomType, room.totalRooms);
-    if (roomNumber === null) {
+    // Validate room number is in allowed range
+    const range = getRoomRange(roomType, room.totalRooms);
+    if (!range || roomNumber < range.start || roomNumber > range.end) {
+      return res.status(400).json({ success: false, message: 'Invalid room number for this room type' });
+    }
+
+    // Check if room is still available
+    const now = new Date();
+    const bookingCount = await Booking.countDocuments({
+      hostel: hostelId,
+      roomType,
+      roomNumber,
+      status: { $in: ROOM_STATUS_ACTIVE },
+    });
+
+    const orderCount = await BookingOrder.countDocuments({
+      hostel: hostelId,
+      roomType,
+      roomNumber,
+      status: ORDER_STATUS_ACTIVE,
+      expiresAt: { $gt: now },
+    });
+
+    const maxOccupancy = roomType === 'Double Bed' ? 2 : 1;
+    if (bookingCount + orderCount >= maxOccupancy) {
       return res.status(400).json({
         success: false,
-        message: 'No rooms are available for this room type right now. Please choose a different room type or try later.',
+        message: 'This room is no longer available. Please select another room.',
       });
     }
 
+    const monthlyRent = room.pricePerMonth;
     const advanceAmount = Math.min(ADVANCE_RUPEES, monthlyRent);
     const balanceDueAtHostel = Math.max(0, monthlyRent - advanceAmount);
     const amountPaise = rupeesToPaise(advanceAmount);

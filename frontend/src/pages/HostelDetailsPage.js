@@ -29,10 +29,19 @@ const HostelDetailsPage = () => {
   const [rateComment, setRateComment] = useState('');
   const [rateLoading, setRateLoading] = useState(false);
   const [rateMessage, setRateMessage] = useState('');
+  const [availableRooms, setAvailableRooms] = useState([]);
+  const [selectedRoomNumber, setSelectedRoomNumber] = useState(null);
+  const [loadingRooms, setLoadingRooms] = useState(false);
   useEffect(() => {
     fetchHostel();
     fetchReviews();
   }, [id]);
+
+  useEffect(() => {
+    if (selectedRoomType && hostel) {
+      fetchAvailableRooms();
+    }
+  }, [selectedRoomType, hostel, id]);
 
   useEffect(() => {
     const fetchWishlistStatus = async () => {
@@ -98,6 +107,27 @@ const HostelDetailsPage = () => {
     setCheckoutPaymentRef('');
   };
 
+  const fetchAvailableRooms = async () => {
+    setLoadingRooms(true);
+    try {
+      const response = await api.get('/hostels/rooms/available', {
+        params: {
+          hostelId: id,
+          roomType: selectedRoomType,
+        },
+      });
+      setAvailableRooms(response.data.availableRooms || []);
+      const available = response.data.availableRooms.find((r) => r.available);
+      setSelectedRoomNumber(available ? available.roomNumber : null);
+    } catch (err) {
+      console.error('Failed to load available rooms:', err);
+      setAvailableRooms([]);
+      setSelectedRoomNumber(null);
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
   const startAdvanceCheckout = async (e) => {
     e.preventDefault();
 
@@ -111,12 +141,18 @@ const HostelDetailsPage = () => {
       return;
     }
 
+    if (selectedRoomNumber == null) {
+      alert('Please select a room');
+      return;
+    }
+
     setCheckoutPaymentRef('');
     setCheckoutPhase('loading');
     try {
       const { data } = await api.post('/payments/booking-order', {
         hostelId: id,
         roomType: selectedRoomType,
+        roomNumber: selectedRoomNumber,
         message,
         forceMock: true,
       });
@@ -126,6 +162,8 @@ const HostelDetailsPage = () => {
       alert(err.response?.data?.message || 'Failed to start payment');
       setCheckoutPhase(null);
       setCheckoutOrder(null);
+      // Refresh available rooms in case the one we tried is now taken
+      fetchAvailableRooms();
     }
   };
 
@@ -301,9 +339,42 @@ const HostelDetailsPage = () => {
                 </select>
               </div>
 
+              {loadingRooms && <div className="loading">Loading available rooms...</div>}
+
+              {!loadingRooms && availableRooms.length > 0 && (
+                <div className="room-selection">
+                  <label>Select Room Number</label>
+                  <div className="room-grid">
+                    {availableRooms.map((room) => (
+                      <button
+                        key={room.roomNumber}
+                        type="button"
+                        className={`room-btn ${room.available ? 'available' : 'occupied'} ${
+                          selectedRoomNumber === room.roomNumber ? 'selected' : ''
+                        }`}
+                        onClick={() => room.available && setSelectedRoomNumber(room.roomNumber)}
+                        disabled={!room.available}
+                        title={
+                          room.available
+                            ? `Room ${room.roomNumber} - Available`
+                            : `Room ${room.roomNumber} - Occupied`
+                        }
+                      >
+                        <div className="room-number">{room.roomNumber}</div>
+                        {!room.available && room.occupants && room.occupants.length > 0 && (
+                          <div className="room-occupant">
+                            <div className="occupant-name">{room.occupants[0].name}</div>
+                            <div className="occupant-phone">{room.occupants[0].phone || 'N/A'}</div>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedRoom && (
                 <div className="room-info">
-                  <p>Available: {selectedRoom.availableRooms} rooms</p>
                   <p className="price">₹{selectedRoom.pricePerMonth}/month</p>
                   <p className="booking-note">
                     {selectedRoom.type === 'Single Bed'

@@ -11,6 +11,7 @@ const {
   getPendingHostels,
   approveHostel,
   rejectHostel,
+  getAvailableRooms,
 } = require('../controllers/hostelController');
 const { protect, authorize, optionalAuth } = require('../middleware/auth');
 const upload = require('../config/multer');
@@ -22,6 +23,7 @@ router.get('/', getHostels);
 // Must be before "/:id" or Express treats "owner" / "admin" as an id
 router.get('/owner/my-hostels', protect, authorize('owner'), getOwnerHostels);
 router.get('/admin/pending', protect, authorize('admin'), getPendingHostels);
+router.get('/rooms/available', getAvailableRooms);
 router.put('/admin/:id/approve', protect, authorize('admin'), approveHostel);
 router.put('/admin/:id/reject', protect, authorize('admin'), rejectHostel);
 router.get('/:id', optionalAuth, getHostelById);
