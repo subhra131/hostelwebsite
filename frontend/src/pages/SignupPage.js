@@ -118,7 +118,7 @@ const SignupPage = () => {
             </select>
           </div>
 
-          {formData.role === 'owner' && (
+          {(formData.role === 'student' || formData.role === 'owner') && (
             <div className="form-group">
               <label>Phone Number</label>
               <input

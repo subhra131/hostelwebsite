@@ -32,9 +32,9 @@ export const validateForm = (name, email, password, role, phone) => {
     errors.password = 'Password must be at least 6 characters';
   }
 
-  if (role === 'owner') {
+  if (role === 'student' || role === 'owner') {
     if (!String(phone || '').trim()) {
-      errors.phone = 'Phone number is required for owners';
+      errors.phone = 'Phone number is required';
     } else if (!validatePhone(phone)) {
       errors.phone = 'Enter a valid phone number';
     }

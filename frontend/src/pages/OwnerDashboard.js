@@ -202,6 +202,11 @@ const OwnerDashboard = () => {
                     <p>
                       <strong>Room Type:</strong> {booking.roomType}
                     </p>
+                    {booking.roomNumber != null && (
+                      <p>
+                        <strong>Room Number:</strong> {booking.roomNumber}
+                      </p>
+                    )}
                     <p>
                       <strong>Monthly rent:</strong> ₹{booking.price}/month
                     </p>

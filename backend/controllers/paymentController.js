@@ -20,6 +20,78 @@ function hasRazorpayKeys() {
   return !!(id && secret && String(id).trim() && String(secret).trim());
 }
 
+const SINGLE_ROOM_RANGE = { start: 1, end: 15 };
+const DOUBLE_ROOM_RANGE = { start: 25, end: 50 };
+const ROOM_STATUS_ACTIVE = ['pending', 'approved'];
+const ORDER_STATUS_ACTIVE = 'created';
+
+function getRoomRange(roomType, totalRooms) {
+  if (roomType === 'Single Bed') {
+    const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 15) : 15;
+    return { start: 1, end: maxRooms };
+  }
+
+  if (roomType === 'Double Bed') {
+    const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 26) : 26;
+    return { start: 25, end: 24 + maxRooms };
+  }
+
+  return null;
+}
+
+async function selectRoomNumber(hostelId, roomType, totalRooms) {
+  const range = getRoomRange(roomType, totalRooms);
+  if (!range) {
+    return undefined;
+  }
+
+  const now = new Date();
+  const bookingFilter = {
+    hostel: hostelId,
+    roomType,
+    status: { $in: ROOM_STATUS_ACTIVE },
+    roomNumber: { $gte: range.start, $lte: range.end },
+  };
+  const ordersFilter = {
+    hostel: hostelId,
+    roomType,
+    status: ORDER_STATUS_ACTIVE,
+    expiresAt: { $gt: now },
+    roomNumber: { $gte: range.start, $lte: range.end },
+  };
+
+  const bookings = await Booking.find(bookingFilter).select('roomNumber');
+  const orders = await BookingOrder.find(ordersFilter).select('roomNumber');
+
+  const occupancy = {};
+  const markRoom = (roomNumber) => {
+    if (!roomNumber || typeof roomNumber !== 'number') return;
+    if (roomNumber < range.start || roomNumber > range.end) return;
+    occupancy[roomNumber] = (occupancy[roomNumber] || 0) + 1;
+  };
+
+  bookings.forEach((booking) => markRoom(booking.roomNumber));
+  orders.forEach((order) => markRoom(order.roomNumber));
+
+  const availableRooms = [];
+  for (let roomNumber = range.start; roomNumber <= range.end; roomNumber += 1) {
+    const count = occupancy[roomNumber] || 0;
+    const maxOccupancy = roomType === 'Double Bed' ? 2 : 1;
+    if (count < maxOccupancy) {
+      availableRooms.push({ roomNumber, count });
+    }
+  }
+
+  if (roomType === 'Double Bed') {
+    const sharedRoom = availableRooms.find((room) => room.count === 1);
+    if (sharedRoom) {
+      return sharedRoom.roomNumber;
+    }
+  }
+
+  return availableRooms.length > 0 ? availableRooms[0].roomNumber : null;
+}
+
 /**
  * POST /api/payments/booking-order
  * Creates a Razorpay order (or mock order if keys are not configured).
@@ -54,6 +126,14 @@ exports.createBookingOrder = async (req, res) => {
     }
 
     const monthlyRent = room.pricePerMonth;
+    const roomNumber = await selectRoomNumber(hostel._id, roomType, room.totalRooms);
+    if (roomNumber === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'No rooms are available for this room type right now. Please choose a different room type or try later.',
+      });
+    }
+
     const advanceAmount = Math.min(ADVANCE_RUPEES, monthlyRent);
     const balanceDueAtHostel = Math.max(0, monthlyRent - advanceAmount);
     const amountPaise = rupeesToPaise(advanceAmount);
@@ -85,6 +165,7 @@ exports.createBookingOrder = async (req, res) => {
       student: req.user.id,
       hostel: hostelId,
       roomType,
+      roomNumber,
       checkInDate: checkInDate || undefined,
       checkOutDate: checkOutDate || undefined,
       message: message != null ? String(message).slice(0, 2000) : '',
@@ -108,6 +189,7 @@ exports.createBookingOrder = async (req, res) => {
       displayAmountRupees: advanceAmount,
       balanceDueAtHostel,
       monthlyRent,
+      roomNumber,
       note: isMockOrder
         ? 'Razorpay keys not set — using demo checkout. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env for live payments.'
         : undefined,
@@ -186,6 +268,7 @@ exports.verifyBookingPayment = async (req, res) => {
       student: order.student,
       hostel: order.hostel,
       roomType: order.roomType,
+      roomNumber: order.roomNumber,
       price: order.monthlyRent,
       checkInDate: order.checkInDate,
       checkOutDate: order.checkOutDate,

@@ -10,6 +10,43 @@ exports.getStudentBookings = async (req, res) => {
       .populate('hostel')
       .populate('student', 'name email phone');
 
+    const doubleBookingConditions = bookings
+      .filter((booking) => booking.roomType === 'Double Bed' && booking.roomNumber != null)
+      .map((booking) => ({
+        hostel: booking.hostel._id,
+        roomType: 'Double Bed',
+        roomNumber: booking.roomNumber,
+        status: { $in: ['pending', 'approved'] },
+        student: { $ne: req.user.id },
+      }));
+
+    if (doubleBookingConditions.length > 0) {
+      const roommateBookings = await Booking.find({ $or: doubleBookingConditions }).populate(
+        'student',
+        'name phone'
+      );
+
+      const roommateMap = {};
+      roommateBookings.forEach((roommate) => {
+        const key = `${roommate.hostel.toString()}_${roommate.roomNumber}`;
+        if (!roommateMap[key]) {
+          roommateMap[key] = {
+            name: roommate.student.name,
+            phone: roommate.student.phone,
+          };
+        }
+      });
+
+      bookings.forEach((booking) => {
+        if (booking.roomType === 'Double Bed' && booking.roomNumber != null) {
+          const key = `${booking.hostel._id.toString()}_${booking.roomNumber}`;
+          if (roommateMap[key]) {
+            booking.roommate = roommateMap[key];
+          }
+        }
+      });
+    }
+
     res.status(200).json({
       success: true,
       count: bookings.length,

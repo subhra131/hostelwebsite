@@ -16,6 +16,9 @@ const bookingOrderSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    roomNumber: {
+      type: Number,
+    },
     checkInDate: { type: Date },
     checkOutDate: { type: Date },
     message: { type: String, default: '' },

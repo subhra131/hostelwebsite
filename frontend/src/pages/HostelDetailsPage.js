@@ -305,6 +305,13 @@ const HostelDetailsPage = () => {
                 <div className="room-info">
                   <p>Available: {selectedRoom.availableRooms} rooms</p>
                   <p className="price">₹{selectedRoom.pricePerMonth}/month</p>
+                  <p className="booking-note">
+                    {selectedRoom.type === 'Single Bed'
+                      ? 'Single rooms are numbered 1–15.'
+                      : selectedRoom.type === 'Double Bed'
+                      ? 'Double rooms are numbered 25–50 and may be shared with a roommate.'
+                      : ''}
+                  </p>
                 </div>
               )}
 

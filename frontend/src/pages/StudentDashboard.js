@@ -101,6 +101,16 @@ const StudentDashboard = () => {
                 <p>
                   <strong>Booked Date:</strong> {new Date(booking.createdAt).toLocaleDateString()}
                 </p>
+                {booking.roomNumber != null && (
+                  <p>
+                    <strong>Room Number:</strong> {booking.roomNumber}
+                  </p>
+                )}
+                {booking.roomType === 'Double Bed' && booking.roommate && (
+                  <p>
+                    <strong>Roommate:</strong> {booking.roommate.name} ({booking.roommate.phone || 'N/A'})
+                  </p>
+                )}
                 {booking.message && (
                   <p>
                     <strong>Your Message:</strong> {booking.message}

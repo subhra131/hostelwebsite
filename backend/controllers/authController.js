@@ -20,6 +20,11 @@ exports.register = async (req, res) => {
     const allowedRoles = ['student', 'owner', 'admin'];
     const resolvedRole = allowedRoles.includes(role) ? role : 'student';
 
+    // Require phone for student/owner registrations
+    if ((resolvedRole === 'student' || resolvedRole === 'owner') && !String(phone || '').trim()) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
+    }
+
     // Create user
     const user = await User.create({
       name,
@@ -81,6 +86,7 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        phone: user.phone,
         isOwnerVerified: user.isOwnerVerified,
       },
     });

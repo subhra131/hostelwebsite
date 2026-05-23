@@ -17,6 +17,9 @@ const bookingSchema = new mongoose.Schema(
       enum: ['Single Bed', 'Double Bed', 'Triple Sharing'],
       required: true,
     },
+    roomNumber: {
+      type: Number,
+    },
     price: {
       type: Number,
       required: true,
