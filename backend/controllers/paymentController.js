@@ -20,20 +20,20 @@ function hasRazorpayKeys() {
   return !!(id && secret && String(id).trim() && String(secret).trim());
 }
 
-const SINGLE_ROOM_RANGE = { start: 1, end: 15 };
+const SINGLE_ROOM_RANGE = { start: 1, end: 24 };
 const DOUBLE_ROOM_RANGE = { start: 25, end: 50 };
 const ROOM_STATUS_ACTIVE = ['pending', 'approved'];
 const ORDER_STATUS_ACTIVE = 'created';
 
 function getRoomRange(roomType, totalRooms) {
   if (roomType === 'Single Bed') {
-    const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 15) : 15;
+    const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 24) : 24;
     return { start: 1, end: maxRooms };
   }
 
   if (roomType === 'Double Bed') {
     const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 26) : 26;
-    return { start: 25, end: 24 + maxRooms };
+    return { start: 25, end: 50 };
   }
 
   return null;
@@ -153,11 +153,20 @@ exports.createBookingOrder = async (req, res) => {
     });
 
     const maxOccupancy = roomType === 'Double Bed' ? 2 : 1;
-    if (bookingCount + orderCount >= maxOccupancy) {
-      return res.status(400).json({
-        success: false,
-        message: 'This room is no longer available. Please select another room.',
-      });
+    const totalOccupancy = bookingCount + orderCount;
+
+    if (totalOccupancy >= maxOccupancy) {
+      if (roomType === 'Double Bed') {
+        return res.status(400).json({
+          success: false,
+          message: 'This double room is fully booked with 2 students. Please select another room.',
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'This room is already booked. Please select another room.',
+        });
+      }
     }
 
     const monthlyRent = room.pricePerMonth;

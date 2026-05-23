@@ -346,25 +346,25 @@
 
 .room-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+  gap: 0.5rem;
 }
 
 .room-btn {
-  padding: 0.8rem;
+  padding: 0.6rem;
   border: 2px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   background-color: var(--surface);
   color: var(--text);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
-  min-height: 100px;
+  gap: 0.2rem;
+  min-height: 75px;
   justify-content: center;
 }
 
@@ -394,24 +394,25 @@
 }
 
 .room-number {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: bold;
 }
 
 .room-occupant {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   text-align: center;
-  margin-top: 0.3rem;
+  margin-top: 0.1rem;
 }
 
 .occupant-name {
   font-weight: 600;
   color: #e74c3c;
+  font-size: 0.65rem;
 }
 
 .occupant-phone {
   color: rgba(15, 23, 42, 0.6);
-  font-size: 0.7rem;
+  font-size: 0.6rem;
 }
 
 .btn-book {

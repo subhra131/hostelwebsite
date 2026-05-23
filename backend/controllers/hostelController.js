@@ -335,12 +335,12 @@ exports.getAvailableRooms = async (req, res) => {
 
     const getRoomRange = (type, totalRooms) => {
       if (type === 'Single Bed') {
-        const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 15) : 15;
+        const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 24) : 24;
         return { start: 1, end: maxRooms };
       }
       if (type === 'Double Bed') {
         const maxRooms = Number.isInteger(totalRooms) && totalRooms > 0 ? Math.min(totalRooms, 26) : 26;
-        return { start: 25, end: 24 + maxRooms };
+        return { start: 25, end: 50 };
       }
       return null;
     };
