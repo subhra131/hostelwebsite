@@ -32,6 +32,7 @@ const HostelDetailsPage = () => {
   const [availableRooms, setAvailableRooms] = useState([]);
   const [selectedRoomNumber, setSelectedRoomNumber] = useState(null);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [existingBooking, setExistingBooking] = useState(null);
   useEffect(() => {
     fetchHostel();
     fetchReviews();
@@ -64,6 +65,36 @@ const HostelDetailsPage = () => {
     };
 
     fetchWishlistStatus();
+  }, [user, id]);
+
+  useEffect(() => {
+    const fetchStudentBooking = async () => {
+      if (!user || user.role !== 'student') {
+        setExistingBooking(null);
+        return;
+      }
+      try {
+        const { data } = await api.get('/bookings/student/my-bookings');
+        const matchingBooking = (data.bookings || []).find((booking) => {
+          const bookingHostelId = booking.hostel?._id || booking.hostel;
+          return bookingHostelId === id || bookingHostelId === String(id);
+        });
+        if (
+          matchingBooking &&
+          matchingBooking.advancePaidRupees > 0 &&
+          ['pending', 'approved'].includes(matchingBooking.status)
+        ) {
+          setExistingBooking(matchingBooking);
+        } else {
+          setExistingBooking(null);
+        }
+      } catch (err) {
+        console.error('Failed to load student booking status:', err);
+        setExistingBooking(null);
+      }
+    };
+
+    fetchStudentBooking();
   }, [user, id]);
 
   const fetchHostel = async () => {
@@ -171,6 +202,7 @@ const HostelDetailsPage = () => {
     setCheckoutPaymentRef(data.booking?.razorpayPaymentId || '');
     setCheckoutPhase('success');
     setBookingSuccess(true);
+    setExistingBooking(data.booking || null);
     setMessage('');
     setTimeout(() => setBookingSuccess(false), 6000);
   };
@@ -315,9 +347,11 @@ const HostelDetailsPage = () => {
           <div className="booking-card">
             <h3>Book Now</h3>
 
-            {bookingSuccess && (
+            {(existingBooking || bookingSuccess) && (
               <div className="success-message">
-                ✓ Advance received — booking request sent! Pay the remaining balance when you arrive at the hostel.
+                ✓ {existingBooking ? 'Advance payment already recorded — your booking request is on file.' : 'Advance received — booking request sent!'}
+                {existingBooking && existingBooking.status === 'pending' && ' Await owner approval.'}
+                {existingBooking && existingBooking.status === 'approved' && ' Your booking is approved by the owner.'}
               </div>
             )}
 
@@ -415,10 +449,12 @@ const HostelDetailsPage = () => {
               <button
                 type="submit"
                 className="btn-book"
-                disabled={checkoutPhase === 'loading' || !user || bookingSuccess}
+                disabled={checkoutPhase === 'loading' || !user || bookingSuccess || Boolean(existingBooking)}
               >
                 {checkoutPhase === 'loading'
                   ? 'Opening checkout…'
+                  : existingBooking
+                  ? 'Advance payment done'
                   : bookingSuccess
                   ? 'Request sent successfully'
                   : user
